@@ -1,0 +1,24 @@
+# CURSOR RULES: ROADASAFE WEB ADMIN DASHBOARD
+
+## Context
+You are building the Admin Web Dashboard for "ROADASAFE" - a real-time pothole detection system using YOLOv8.
+
+## Tech Stack
+- React.js + TypeScript (Vite)
+- Styling: Tailwind CSS
+- Routing: react-router-dom
+- Maps: leaflet & react-leaflet
+- Icons: lucide-react
+
+## Business Logic & Thresholds
+- Urgency Formula: Score = (0.35 * L) + (0.25 * K) + (0.20 * P) + (0.20 * T)
+- Categories:
+  - Low: 0 - 33 (Green marker)
+  - Medium: 34 - 66 (Yellow marker)
+  - High: 67 - 100 (Red marker)
+- Statuses: Pending, Terverifikasi, Dalam Penanganan, Selesai, Ditolak
+
+## Guidelines
+- Write modular, clean TypeScript components.
+- Use mock data until REST endpoints are connected.
+- Keep UI modern and enterprise-grade using Tailwind CSS.
