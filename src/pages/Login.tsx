@@ -16,16 +16,13 @@ import PublicFrame from "../components/layout/PublicFrame";
 import { login as loginRequest } from "../services/api";
 import { isOnboarded, readSession, startSession } from "../services/session";
 
-const DEMO_EMAIL = "verifikator@pupr.go.id";
-const DEMO_PASSWORD = "secretPassword123";
-
 export default function Login() {
   const navigate = useNavigate();
   const emailId = useId();
   const passwordId = useId();
-  const [email, setEmail] = useState(DEMO_EMAIL);
-  const [password, setPassword] = useState(DEMO_PASSWORD);
-  const [showPassword, setShowPassword] = useState(true);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [rememberDevice, setRememberDevice] = useState(true);
   const [error, setError] = useState("");
   const [resetHint, setResetHint] = useState(false);
@@ -99,6 +96,7 @@ export default function Login() {
                     name="email"
                     type="email"
                     autoComplete="username"
+                    placeholder="nama@dinas.go.id"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                     className="h-11 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
