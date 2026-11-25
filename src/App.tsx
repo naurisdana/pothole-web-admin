@@ -4,6 +4,7 @@ import DashboardShell from "./components/layout/DashboardShell";
 import Analytics from "./pages/Analytics";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
+import ManualReport from "./pages/ManualReport.tsx";
 import MapPage from "./pages/MapPage";
 import Onboarding from "./pages/Onboarding";
 
@@ -17,6 +18,7 @@ export default function App() {
           <Route element={<DashboardShell />}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/analitik" element={<Analytics />} />
+            <Route path="/laporan" element={<ManualReport />} />
             <Route path="/map" element={<MapPage />} />
           </Route>
         </Route>

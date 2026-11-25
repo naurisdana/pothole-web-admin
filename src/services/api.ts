@@ -76,7 +76,8 @@ async function apiFetch(path: string, init: RequestInit = {}): Promise<Response>
   const headers = new Headers(init.headers);
   const token = readToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  if (init.body && !headers.has("Content-Type")) {
+  const isForm = typeof FormData !== "undefined" && init.body instanceof FormData;
+  if (init.body && !isForm && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
   const response = await fetch(`${API_BASE}${path}`, { ...init, headers });
@@ -176,6 +177,59 @@ export async function updateReportStatus(serverId: number, status: ReportStatus)
     method: "PATCH",
     body: JSON.stringify({ status }),
   });
+}
+
+export type ManualReportInput = {
+  file: File;
+  street: string;
+  latitude: number;
+  longitude: number;
+  accuracyM: number;
+  parameters: { L: number; K: number; P: number; T: number };
+};
+
+function webDeviceId(): string {
+  const key = "roadsafe.webDeviceId";
+  const existing = window.localStorage.getItem(key);
+  if (existing) return existing;
+  const created = `web-${crypto.randomUUID()}`;
+  window.localStorage.setItem(key, created);
+  return created;
+}
+
+export async function submitManualReport(input: ManualReportInput): Promise<PotholeReport> {
+  const deviceId = webDeviceId();
+  try {
+    await apiFetch("/devices/register", {
+      method: "POST",
+      body: JSON.stringify({
+        id: deviceId,
+        model_perangkat: "Web Admin",
+        versi_app: "web-1.0",
+      }),
+    });
+  } catch {
+    // Perangkat web sudah terdaftar. Unggahan laporan tetap dilanjutkan.
+  }
+
+  const form = new FormData();
+  form.append("gambar", input.file);
+  form.append("device_id", deviceId);
+  form.append("latitude", String(input.latitude));
+  form.append("longitude", String(input.longitude));
+  form.append("akurasi_gps", String(input.accuracyM));
+  form.append("confidence", "1");
+  form.append("nilai_L", String(input.parameters.L));
+  form.append("nilai_K", String(input.parameters.K));
+  form.append("nilai_P", String(input.parameters.P));
+  form.append("nilai_T", String(input.parameters.T));
+  form.append("lokasi_jalan", input.street);
+  form.append("tipe_kerusakan", "Lubang (Pothole)");
+  form.append("versi_model", "input-manual-web");
+  form.append("waktu", new Date().toISOString());
+
+  const response = await apiFetch("/reports/", { method: "POST", body: form });
+  return mapReport((await response.json()) as ApiReport);
 }
 
 export async function downloadServerCsv(): Promise<void> {
