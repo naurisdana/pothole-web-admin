@@ -1,14 +1,25 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { Calendar, Download, Route } from "lucide-react";
-import {
-  currentVerifier,
-  dashboardStats,
-  downloadReportsCsv,
-} from "../../services/mockData";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import { Calendar, Download, LogOut, Route } from "lucide-react";
+import { endSession, readUser } from "../../services/session";
+import { downloadServerCsv } from "../../services/api";
 
 export default function Header() {
+  const navigate = useNavigate();
   const [exported, setExported] = useState(false);
+  const [exportError, setExportError] = useState("");
+  const user = readUser();
+  const today = new Intl.DateTimeFormat("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(new Date());
+  const initials = (user?.nama ?? "VS")
+    .split(" ")
+    .filter((part) => part && part !== "(" && !part.endsWith(")"))
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
 
   useEffect(() => {
     if (!exported) return undefined;
@@ -17,9 +28,19 @@ export default function Header() {
     return () => window.clearTimeout(timer);
   }, [exported]);
 
-  function handleExport() {
-    downloadReportsCsv();
-    setExported(true);
+  async function handleExport() {
+    setExportError("");
+    try {
+      await downloadServerCsv();
+      setExported(true);
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : "Ekspor gagal.");
+    }
+  }
+
+  function handleLogout() {
+    endSession();
+    navigate("/login", { replace: true });
   }
 
   return (
@@ -45,6 +66,26 @@ export default function Header() {
             </span>
           </Link>
 
+          <nav className="flex items-center gap-1 rounded-xl bg-slate-100 p-1 text-sm font-semibold">
+            <NavLink
+              to="/"
+              end
+              className={({ isActive }) =>
+                `rounded-lg px-3 py-1.5 ${isActive ? "bg-white text-blue-700 shadow-sm" : "text-slate-500 hover:text-slate-800"}`
+              }
+            >
+              Verifikasi
+            </NavLink>
+            <NavLink
+              to="/analitik"
+              className={({ isActive }) =>
+                `rounded-lg px-3 py-1.5 ${isActive ? "bg-white text-blue-700 shadow-sm" : "text-slate-500 hover:text-slate-800"}`
+              }
+            >
+              Analitik
+            </NavLink>
+          </nav>
+
           <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs">
             <span className="h-2 w-2 rounded-full bg-emerald-500" />
             <span className="font-semibold text-emerald-600">Server Live</span>
@@ -56,7 +97,7 @@ export default function Header() {
         <div className="flex flex-wrap items-center gap-3">
           <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600">
             <Calendar className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
-            Hari ini: {dashboardStats.asOfLabel}
+            Hari ini: {today}
           </div>
 
           <button
@@ -67,17 +108,26 @@ export default function Header() {
             <Download className="h-4 w-4" aria-hidden="true" />
             {exported ? "CSV terunduh" : "Ekspor Data (.CSV)"}
           </button>
+          {exportError ? <p className="w-full text-right text-xs text-rose-600">{exportError}</p> : null}
 
           <div className="flex items-center gap-3 pl-1">
             <div className="text-right leading-tight">
               <p className="text-sm font-semibold text-slate-800">
-                {currentVerifier.name}
+                {user?.nama ?? "Verifikator"}
               </p>
-              <p className="text-[11px] text-slate-400">{currentVerifier.role}</p>
+              <p className="text-[11px] text-slate-400">{user?.peran ?? "Dinas PUPR"}</p>
             </div>
             <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">
-              {currentVerifier.initials}
+              {initials || "VS"}
             </span>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+            >
+              <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
+              Keluar
+            </button>
           </div>
         </div>
       </div>

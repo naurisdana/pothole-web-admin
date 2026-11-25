@@ -36,6 +36,13 @@ export interface PotholeReport {
   report_count: number;
   street?: string;
   city?: string;
+  serverId?: number;
+  accuracyM?: number;
+  speedKmh?: number;
+  headingDeg?: number;
+  confidence?: number;
+  modelVersion?: string;
+  deviceId?: string;
 }
 
 export const URGENCY_WEIGHTS = {

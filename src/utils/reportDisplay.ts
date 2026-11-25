@@ -1,7 +1,5 @@
 import type { PotholeReport, ReportCategory, ReportStatus } from "../types/report";
 
-const QUEUE_REFERENCE = new Date("2024-10-24T10:00:00+07:00").getTime();
-
 export const CATEGORY_META: Record<
   ReportCategory,
   { label: string; text: string; dot: string; marker: string }
@@ -39,8 +37,8 @@ export function formatScore(score: number): string {
 }
 
 export function formatRelativeTime(timestamp: string): string {
-  const minutes = Math.round((QUEUE_REFERENCE - new Date(timestamp).getTime()) / 60000);
-  if (minutes < 1) return "baru saja";
+  const minutes = Math.round((Date.now() - new Date(timestamp).getTime()) / 60000);
+  if (!Number.isFinite(minutes) || minutes < 1) return "baru saja";
   if (minutes < 60) return `${minutes} menit lalu`;
 
   const hours = Math.floor(minutes / 60);

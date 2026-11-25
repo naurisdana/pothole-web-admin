@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { updateReportStatus } from "../services/api";
 import type { PotholeReport, ReportCategory, ReportStatus } from "../types/report";
 
 export const PAGE_SIZE = 5;
@@ -15,6 +16,11 @@ export function useReportQueue(initialReports: PotholeReport[]) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [focusTick, setFocusTick] = useState(0);
+  const [statusError, setStatusError] = useState("");
+
+  useEffect(() => {
+    setReports(initialReports);
+  }, [initialReports]);
 
   const filtered = useMemo(() => {
     const keyword = query.trim().toLowerCase();
@@ -76,10 +82,22 @@ export function useReportQueue(initialReports: PotholeReport[]) {
     setDetailOpen(false);
   }
 
-  function updateStatus(id: string, status: ReportStatus) {
+  async function updateStatus(id: string, status: ReportStatus) {
+    const previous = reports;
+    const target = reports.find((report) => report.id === id);
+    setStatusError("");
     setReports((current) =>
       current.map((report) => (report.id === id ? { ...report, status } : report)),
     );
+    if (target?.serverId == null) return;
+    try {
+      await updateReportStatus(target.serverId, status);
+    } catch (error) {
+      setReports(previous);
+      const message = error instanceof Error ? error.message : "Status gagal diperbarui.";
+      setStatusError(message);
+      throw new Error(message);
+    }
   }
 
   return {
@@ -96,6 +114,7 @@ export function useReportQueue(initialReports: PotholeReport[]) {
     selected,
     detailOpen,
     focusTick,
+    statusError,
     changeQuery,
     changeStatus,
     changeCategory,

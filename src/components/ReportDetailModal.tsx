@@ -63,7 +63,7 @@ type InspectionTelemetry = {
 type ReportDetailModalProps = {
   report: PotholeReport | null;
   onClose: () => void;
-  onStatusChange: (id: string, status: ReportStatus) => void;
+  onStatusChange: (id: string, status: ReportStatus) => void | Promise<void>;
 };
 
 function formatCaptureTime(timestamp: string): string {
@@ -101,6 +101,21 @@ function roadHint(density: number): string {
 }
 
 function telemetryFor(report: PotholeReport): InspectionTelemetry {
+  const hasLiveReading = report.accuracyM != null || report.speedKmh != null || report.headingDeg != null;
+  if (hasLiveReading) {
+    return {
+      accuracyM: report.accuracyM ?? 0,
+      speedKmh: report.speedKmh ?? 0,
+      headingDeg: report.headingDeg ?? 0,
+      deviceUuid: report.deviceId || "perangkat lapangan",
+      deviceName: report.deviceId || "Perangkat lapangan",
+      model: report.modelVersion || "YOLOv8",
+      fileKb: 0,
+      sha: report.image_url.split("/").pop() || "bukti-server",
+      district: report.city || "Wilayah laporan",
+    };
+  }
+
   if (report.id === "RS-20241024-001") {
     return {
       accuracyM: 3.8,
@@ -131,6 +146,9 @@ function telemetryFor(report: PotholeReport): InspectionTelemetry {
 }
 
 function detectionConfidence(report: PotholeReport): number {
+  if (report.confidence != null) {
+    return report.confidence <= 1 ? Math.round(report.confidence * 100) : Math.round(report.confidence);
+  }
   if (report.id === "RS-20241024-001") return 84;
   return Math.min(97, Math.max(62, Math.round(62 + report.score * 0.28)));
 }
@@ -252,9 +270,13 @@ export default function ReportDetailModal({
     },
   ] as const;
 
-  function applyStatus(status: ReportStatus) {
-    onStatusChange(current.id, status);
-    setNotice(`Status diperbarui menjadi ${DECISION_LABEL[status]}.`);
+  async function applyStatus(status: ReportStatus) {
+    try {
+      await onStatusChange(current.id, status);
+      setNotice(`Status diperbarui menjadi ${DECISION_LABEL[status]}.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Status gagal diperbarui.");
+    }
   }
 
   return (

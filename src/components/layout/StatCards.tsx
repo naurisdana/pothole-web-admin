@@ -1,6 +1,6 @@
-import type { ReactNode } from "react";
-import { CircleCheck, ClipboardList, MapPin, TrendingUp, Wrench } from "lucide-react";
-import { dashboardStats } from "../../services/mockData";
+import { useEffect, useState, type ReactNode } from "react";
+import { CircleCheck, ClipboardList, MapPin, Wrench } from "lucide-react";
+import { getReportSummary, type ReportSummary } from "../../services/api";
 
 type Tone = "slate" | "orange" | "blue" | "green";
 
@@ -86,26 +86,47 @@ function StatCard({
 }
 
 export default function StatCards() {
+  const [summary, setSummary] = useState<ReportSummary | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    getReportSummary()
+      .then((value) => {
+        if (active) setSummary(value);
+      })
+      .catch((reason: unknown) => {
+        if (active) setError(reason instanceof Error ? reason.message : "Ringkasan gagal dimuat.");
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const total = summary?.totalReports ?? 0;
+  const ratio =
+    summary && total > 0 ? `${((summary.verifiedAndHandled / total) * 100).toFixed(1)}% ratio` : "—";
+  const valueOf = (value: number | undefined) => (summary ? formatCount(value ?? 0) : "—");
+
   return (
     <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      {error ? (
+        <p role="alert" className="md:col-span-2 xl:col-span-4 text-sm text-rose-600">
+          {error}
+        </p>
+      ) : null}
       <StatCard
         tone="slate"
         showAccent={false}
         label="Total Laporan Terdata"
-        value={formatCount(dashboardStats.totalReports)}
+        value={valueOf(summary?.totalReports)}
         caption="Titik terpetakan dalam sistem"
         icon={<MapPin className="h-5 w-5" aria-hidden="true" />}
-        badge={
-          <span className="mb-1 inline-flex items-center gap-1 text-xs font-semibold text-emerald-500">
-            <TrendingUp className="h-3.5 w-3.5" aria-hidden="true" />+
-            {dashboardStats.totalChangePercent}%
-          </span>
-        }
       />
       <StatCard
         tone="orange"
         label="Menunggu Verifikasi"
-        value={formatCount(dashboardStats.pendingVerification)}
+        value={valueOf(summary?.pendingVerification)}
         caption="Perlu aksi verifikator dinas"
         icon={<ClipboardList className="h-5 w-5" aria-hidden="true" />}
         badge={
@@ -117,25 +138,25 @@ export default function StatCards() {
       <StatCard
         tone="blue"
         label="Terverifikasi & Ditangani"
-        value={formatCount(dashboardStats.verifiedAndHandled)}
+        value={valueOf(summary?.verifiedAndHandled)}
         caption="Diteruskan ke tim lapangan PUPR"
         icon={<Wrench className="h-5 w-5" aria-hidden="true" />}
         badge={
           <span className="mb-1 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-600">
-            {dashboardStats.verifiedRatioLabel}
+            {ratio}
           </span>
         }
       />
       <StatCard
         tone="green"
         label="Selesai Ditambal"
-        value={formatCount(dashboardStats.completed)}
+        value={valueOf(summary?.completed)}
         caption="Perbaikan selesai & tertutup"
         icon={<CircleCheck className="h-5 w-5" aria-hidden="true" />}
         badge={
           <span className="mb-1 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-600">
             <CircleCheck className="h-3 w-3" aria-hidden="true" />
-            {dashboardStats.qaLabel}
+            {summary ? `${summary.rejected} ditolak` : "—"}
           </span>
         }
       />

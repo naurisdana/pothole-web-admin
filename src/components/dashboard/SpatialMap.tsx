@@ -41,11 +41,13 @@ function pinIcon(color: string, active: boolean): DivIcon {
   return icon;
 }
 
-const LEGEND = [
-  { label: "Tinggi (>70)", count: "18 Titik", dot: "bg-red-500" },
-  { label: "Sedang (40–70)", count: "19 Titik", dot: "bg-amber-400" },
-  { label: "Rendah (<40)", count: "5 Titik", dot: "bg-emerald-500" },
-];
+function legendFor(reports: PotholeReport[]) {
+  return [
+    { label: "Tinggi (>70)", count: reports.filter((report) => report.category === "High").length, dot: "bg-red-500" },
+    { label: "Sedang (40–70)", count: reports.filter((report) => report.category === "Medium").length, dot: "bg-amber-400" },
+    { label: "Rendah (<40)", count: reports.filter((report) => report.category === "Low").length, dot: "bg-emerald-500" },
+  ];
+}
 
 function MapControls() {
   const map = useMap();
@@ -224,13 +226,13 @@ export default function SpatialMap({ reports, selectedId, focusTick, onSelect }:
           <span>SEVERITY AI</span>
         </div>
         <ul className="mt-2 space-y-1.5">
-          {LEGEND.map((item) => (
+          {legendFor(reports).map((item) => (
             <li key={item.label} className="flex items-center justify-between text-[11px]">
               <span className="inline-flex items-center gap-2 text-slate-600">
                 <span className={`h-2.5 w-2.5 rounded-full ${item.dot}`} />
                 {item.label}
               </span>
-              <span className="font-medium text-slate-500">{item.count}</span>
+              <span className="font-medium text-slate-500">{item.count} Titik</span>
             </li>
           ))}
         </ul>
