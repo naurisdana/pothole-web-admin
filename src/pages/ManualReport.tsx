@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import { divIcon } from "leaflet";
 import { Camera, CheckCircle2, LocateFixed, MapPin } from "lucide-react";
 import { submitManualReport } from "../services/api";
+import { detectPotholes, warmupPotholeModel, type PotholeBox } from "../services/potholeDetector";
 import { calculateScore, categoryFromScore, type ReportCategory, type ReportParameters } from "../types/report";
 import "leaflet/dist/leaflet.css";
 
@@ -67,35 +68,87 @@ function parseCoordinate(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function DetectionPreview({ url, boxes }: { url: string; boxes: PotholeBox[] }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return undefined;
+    const image = new Image();
+    let cancelled = false;
+    image.onload = () => {
+      if (cancelled) return;
+      const maxWidth = canvas.parentElement?.clientWidth ?? 480;
+      const maxHeight = 288;
+      const scale = Math.min(maxWidth / image.naturalWidth, maxHeight / image.naturalHeight);
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const context = canvas.getContext("2d");
+      if (!context) return;
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      context.lineWidth = 2;
+      context.font = "700 12px sans-serif";
+      boxes.forEach((box, index) => {
+        const x = box.left * canvas.width;
+        const y = box.top * canvas.height;
+        const width = (box.right - box.left) * canvas.width;
+        const height = (box.bottom - box.top) * canvas.height;
+        context.strokeStyle = "#facc15";
+        context.strokeRect(x, y, width, height);
+        const label = `P-${String(index + 1).padStart(3, "0")} ${Math.round(box.confidence * 100)}%`;
+        const labelWidth = context.measureText(label).width + 8;
+        const labelTop = Math.max(0, y - 18);
+        context.fillStyle = "#111827";
+        context.fillRect(x, labelTop, labelWidth, 18);
+        context.fillStyle = "#facc15";
+        context.fillText(label, x + 4, labelTop + 13);
+      });
+    };
+    image.src = url;
+    return () => {
+      cancelled = true;
+    };
+  }, [url, boxes]);
+
+  return <canvas ref={canvasRef} className="max-h-72 max-w-full" aria-label="Pratinjau foto lubang" />;
+}
+
 export default function ManualReport() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState("");
   const [street, setStreet] = useState("");
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [urgency, setUrgency] = useState<ReportCategory>("Medium");
+  const [manualUrgency, setManualUrgency] = useState(false);
+  const [detectedParameters, setDetectedParameters] = useState<ReportParameters | null>(null);
+  const [detectedConfidence, setDetectedConfidence] = useState<number | null>(null);
+  const [boxes, setBoxes] = useState<PotholeBox[]>([]);
+  const [scanNote, setScanNote] = useState("");
   const [flyToken, setFlyToken] = useState(0);
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [createdCode, setCreatedCode] = useState("");
 
+  const preview = useMemo(() => (file ? URL.createObjectURL(file) : ""), [file]);
+
   useEffect(() => {
-    if (!file) {
-      setPreview("");
-      return undefined;
-    }
-    const url = URL.createObjectURL(file);
-    setPreview(url);
-    return () => URL.revokeObjectURL(url);
-  }, [file]);
+    return () => {
+      if (preview) URL.revokeObjectURL(preview);
+    };
+  }, [preview]);
+
+  useEffect(() => {
+    warmupPotholeModel();
+  }, []);
 
   const lat = parseCoordinate(latitude);
   const lng = parseCoordinate(longitude);
   const hasPoint = lat !== null && lng !== null && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
-  const score = calculateScore(URGENCY[urgency].parameters);
+  const activeParameters = !manualUrgency && detectedParameters ? detectedParameters : URGENCY[urgency].parameters;
+  const score = calculateScore(activeParameters);
   const category = categoryFromScore(score);
 
   function choosePhoto(event: ChangeEvent<HTMLInputElement>) {
@@ -112,6 +165,32 @@ export default function ManualReport() {
       return;
     }
     setFile(next);
+    void scanPhoto(next);
+  }
+
+  async function scanPhoto(next: File) {
+    setBoxes([]);
+    setDetectedParameters(null);
+    setDetectedConfidence(null);
+    setManualUrgency(false);
+    setScanNote("Model sedang membaca foto...");
+    try {
+      const scan = await detectPotholes(next);
+      setBoxes(scan.boxes);
+      if (!scan.primary) {
+        setScanNote("Model tidak melihat lubang pada foto ini. Urgensi bisa dipilih manual.");
+        return;
+      }
+      setDetectedParameters(scan.primary.parameters);
+      setDetectedConfidence(scan.primary.box.confidence);
+      setUrgency(scan.primary.category);
+      const percent = Math.round(scan.primary.box.confidence * 100);
+      setScanNote(
+        `Model melihat lubang ${percent}%. Skor ${scan.primary.score.toFixed(1)}. K diperkirakan dari bentuk kotak.`,
+      );
+    } catch {
+      setScanNote("Model belum bisa membaca foto ini. Urgensi tetap bisa dipilih manual.");
+    }
   }
 
   function placePoint(nextLat: number, nextLng: number, nextAccuracy: number) {
@@ -177,10 +256,16 @@ export default function ManualReport() {
         latitude: lat,
         longitude: lng,
         accuracyM: accuracy,
-        parameters: URGENCY[urgency].parameters,
+        parameters: activeParameters,
+        confidence: detectedConfidence ?? 1,
+        modelVersion: detectedParameters && !manualUrgency ? "yolo11s-seg-pothole" : "input-manual-web",
       });
       setCreatedCode(report.id);
       setFile(null);
+      setBoxes([]);
+      setScanNote("");
+      setDetectedParameters(null);
+      setDetectedConfidence(null);
       if (fileRef.current) fileRef.current.value = "";
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Laporan gagal dikirim.");
@@ -194,7 +279,7 @@ export default function ManualReport() {
       <div className="mb-4">
         <h1 className="text-lg font-extrabold tracking-tight text-slate-900">Laporkan lubang secara manual</h1>
         <p className="mt-1 max-w-2xl text-sm text-slate-500">
-          Unggah foto bukti dan tandai lokasi. Laporan masuk ke antrean verifikasi yang sama dengan hasil kamera ponsel.
+          Unggah foto bukti. Model YOLO11s membaca lubang pada foto, lalu laporan masuk ke antrean verifikasi yang sama dengan kamera ponsel.
         </p>
       </div>
 
@@ -204,7 +289,7 @@ export default function ManualReport() {
           <p className="mt-1 text-xs text-slate-500">JPG, PNG, atau WEBP, maksimal 8 MB.</p>
           <label className="mt-4 flex min-h-72 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-300 bg-slate-50 text-center hover:border-blue-400 hover:bg-blue-50/40">
             {preview ? (
-              <img src={preview} alt="Pratinjau foto lubang" className="h-72 w-full object-cover" />
+              <DetectionPreview url={preview} boxes={boxes} />
             ) : (
               <span className="px-6 py-16">
                 <Camera className="mx-auto h-8 w-8 text-blue-600" aria-hidden="true" />
@@ -220,6 +305,7 @@ export default function ManualReport() {
               onChange={choosePhoto}
             />
           </label>
+          {scanNote ? <p className="mt-2 text-xs font-medium text-slate-600">{scanNote}</p> : null}
           {file ? (
             <p className="mt-2 truncate text-xs text-slate-500">{file.name}</p>
           ) : null}
@@ -317,14 +403,17 @@ export default function ManualReport() {
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="text-sm font-bold text-slate-900">Urgensi awal</h2>
             <p className="mt-1 text-xs text-slate-500">
-              Skor perkiraan {score.toFixed(1)} · {category === "High" ? "Tinggi" : category === "Medium" ? "Sedang" : "Rendah"}. Server menghitung ulang dari parameter L, K, P, dan T.
+              Skor perkiraan {score.toFixed(1)} · {category === "High" ? "Tinggi" : category === "Medium" ? "Sedang" : "Rendah"}. L {Math.round(activeParameters.L)} · K {Math.round(activeParameters.K)} · P {Math.round(activeParameters.P)} · T {Math.round(activeParameters.T)}.
             </p>
             <div className="mt-3 grid gap-2 sm:grid-cols-3">
               {(Object.keys(URGENCY) as ReportCategory[]).map((key) => (
                 <button
                   key={key}
                   type="button"
-                  onClick={() => setUrgency(key)}
+                  onClick={() => {
+                    setManualUrgency(true);
+                    setUrgency(key);
+                  }}
                   className={`rounded-xl border px-3 py-2 text-left ${
                     urgency === key
                       ? "border-blue-600 bg-blue-50 text-blue-800"

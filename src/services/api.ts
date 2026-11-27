@@ -2,7 +2,9 @@ import type { PotholeReport, ReportCategory, ReportStatus } from "../types/repor
 import { categoryFromScore } from "../types/report";
 import { readToken } from "./session";
 
-export const API_ORIGIN = "https://api-roadasafe.houselab.my.id";
+export const API_ORIGIN = (
+  import.meta.env.VITE_API_URL || "https://api-roadasafe.houselab.my.id"
+).replace(/\/$/, "");
 export const API_BASE = `${API_ORIGIN}/api/v1`;
 
 const STATUSES: ReportStatus[] = [
@@ -186,6 +188,8 @@ export type ManualReportInput = {
   longitude: number;
   accuracyM: number;
   parameters: { L: number; K: number; P: number; T: number };
+  confidence?: number;
+  modelVersion?: string;
 };
 
 function webDeviceId(): string {
@@ -218,14 +222,14 @@ export async function submitManualReport(input: ManualReportInput): Promise<Poth
   form.append("latitude", String(input.latitude));
   form.append("longitude", String(input.longitude));
   form.append("akurasi_gps", String(input.accuracyM));
-  form.append("confidence", "1");
+  form.append("confidence", String(input.confidence ?? 1));
   form.append("nilai_L", String(input.parameters.L));
   form.append("nilai_K", String(input.parameters.K));
   form.append("nilai_P", String(input.parameters.P));
   form.append("nilai_T", String(input.parameters.T));
   form.append("lokasi_jalan", input.street);
   form.append("tipe_kerusakan", "Lubang (Pothole)");
-  form.append("versi_model", "input-manual-web");
+  form.append("versi_model", input.modelVersion ?? "input-manual-web");
   form.append("waktu", new Date().toISOString());
 
   const response = await apiFetch("/reports/", { method: "POST", body: form });

@@ -1,16 +1,22 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { updateReportStatus } from "../services/api";
 import type { PotholeReport, ReportCategory, ReportStatus } from "../types/report";
 
 export const PAGE_SIZE = 5;
 
-export type StatusFilter = "Semua" | ReportStatus;
+export type StatusFilter = "Semua" | "Terverifikasi & Ditangani" | ReportStatus;
 export type CategoryFilter = "Semua" | ReportCategory;
 
-export function useReportQueue(initialReports: PotholeReport[]) {
+export function useReportQueue(
+  initialReports: PotholeReport[],
+  controlledStatus?: StatusFilter,
+  onControlledStatusChange?: (status: StatusFilter) => void,
+) {
   const [reports, setReports] = useState(initialReports);
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("Semua");
+  const [internalStatusFilter, setInternalStatusFilter] = useState<StatusFilter>("Semua");
+  const statusFilter = controlledStatus ?? internalStatusFilter;
+  const setStatusFilter = onControlledStatusChange ?? setInternalStatusFilter;
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("Semua");
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -18,9 +24,11 @@ export function useReportQueue(initialReports: PotholeReport[]) {
   const [focusTick, setFocusTick] = useState(0);
   const [statusError, setStatusError] = useState("");
 
-  useEffect(() => {
+  const [prevInitial, setPrevInitial] = useState(initialReports);
+  if (initialReports !== prevInitial) {
+    setPrevInitial(initialReports);
     setReports(initialReports);
-  }, [initialReports]);
+  }
 
   const filtered = useMemo(() => {
     const keyword = query.trim().toLowerCase();
@@ -28,18 +36,17 @@ export function useReportQueue(initialReports: PotholeReport[]) {
     return reports.filter((report) => {
       const haystack = `${report.street ?? ""} ${report.city ?? ""}`.toLowerCase();
       const matchesQuery = keyword.length === 0 || haystack.includes(keyword);
-      const matchesStatus = statusFilter === "Semua" || report.status === statusFilter;
+      const matchesStatus =
+        statusFilter === "Semua" ||
+        (statusFilter === "Terverifikasi & Ditangani"
+          ? report.status === "Terverifikasi" || report.status === "Dalam Penanganan"
+          : report.status === statusFilter);
       const matchesCategory = categoryFilter === "Semua" || report.category === categoryFilter;
       return matchesQuery && matchesStatus && matchesCategory;
     });
   }, [reports, query, statusFilter, categoryFilter]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-
-  useEffect(() => {
-    if (page > pageCount) setPage(pageCount);
-  }, [page, pageCount]);
-
   const currentPage = Math.min(page, pageCount);
   const startIndex = (currentPage - 1) * PAGE_SIZE;
   const pageReports = filtered.slice(startIndex, startIndex + PAGE_SIZE);
@@ -96,7 +103,7 @@ export function useReportQueue(initialReports: PotholeReport[]) {
       setReports(previous);
       const message = error instanceof Error ? error.message : "Status gagal diperbarui.";
       setStatusError(message);
-      throw new Error(message);
+      throw new Error(message, { cause: error });
     }
   }
 

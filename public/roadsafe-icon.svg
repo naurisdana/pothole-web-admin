@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none" shape-rendering="geometricPrecision">
+  <!-- Background Rounded Square (Squircle) -->
+  <rect x="0" y="0" width="512" height="512" rx="136" ry="136" fill="#2563EB"/>
+
+  <!-- Centered Route Icon -->
+  <g stroke="#FFFFFF" stroke-width="23" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="192" cy="330.67" r="32"/>
+    <path d="M224 330.67h90.67a37.33 37.33 0 0 0 0-74.67H197.33a37.33 37.33 0 0 1 0-74.67H288"/>
+    <circle cx="320" cy="181.33" r="32"/>
+  </g>
+</svg>

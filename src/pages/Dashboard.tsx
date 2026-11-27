@@ -1,16 +1,19 @@
 import { useEffect, useState } from "react";
+import { useOutletContext } from "react-router-dom";
 import ReportDetailModal from "../components/ReportDetailModal";
 import ReportQueue from "../components/dashboard/ReportQueue";
 import SpatialMap from "../components/dashboard/SpatialMap";
+import type { DashboardOutletContext } from "../components/layout/DashboardShell";
 import { useReportQueue } from "../hooks/useReportQueue";
 import { listReports } from "../services/api";
 import type { PotholeReport } from "../types/report";
 
 export default function Dashboard() {
+  const { statusFilter, setStatusFilter } = useOutletContext<DashboardOutletContext>();
   const [reports, setReports] = useState<PotholeReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const queue = useReportQueue(reports);
+  const queue = useReportQueue(reports, statusFilter, setStatusFilter);
 
   useEffect(() => {
     let active = true;

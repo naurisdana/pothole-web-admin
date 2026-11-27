@@ -9,7 +9,6 @@ import {
   IdCard,
   LifeBuoy,
   Lock,
-  Shield,
 } from "lucide-react";
 
 import PublicFrame from "../components/layout/PublicFrame";
@@ -70,9 +69,12 @@ export default function Login() {
             onSubmit={handleSubmit}
             className="w-full rounded-2xl border border-slate-200/80 bg-white px-7 py-8 shadow-[0_12px_40px_rgba(15,23,42,0.06)] sm:px-8"
           >
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
-              <Shield className="h-6 w-6" aria-hidden="true" />
-            </div>
+            <img
+              src="/roadsafe-icon.svg"
+              alt=""
+              aria-hidden="true"
+              className="mx-auto h-12 w-12 shrink-0 drop-shadow-sm"
+            />
             <h1 className="mt-4 text-center text-[26px] font-extrabold tracking-tight text-slate-900">
               ROADSAFE <span className="text-blue-600">ADMIN</span>
             </h1>

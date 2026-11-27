@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { CircleCheck, ClipboardList, MapPin, Wrench } from "lucide-react";
+import type { StatusFilter } from "../../hooks/useReportQueue";
 import { getReportSummary, type ReportSummary } from "../../services/api";
 
 type Tone = "slate" | "orange" | "blue" | "green";
@@ -46,6 +47,8 @@ type StatCardProps = {
   icon: ReactNode;
   badge?: ReactNode;
   showAccent?: boolean;
+  active?: boolean;
+  onClick?: () => void;
 };
 
 function StatCard({
@@ -56,11 +59,20 @@ function StatCard({
   icon,
   badge,
   showAccent = true,
+  active = false,
+  onClick,
 }: StatCardProps) {
   const style = tones[tone];
 
   return (
-    <article className="relative flex min-h-[118px] items-center justify-between overflow-hidden rounded-2xl border border-slate-200/80 bg-white px-5 py-4 shadow-sm">
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`relative flex min-h-[118px] w-full cursor-pointer items-center justify-between overflow-hidden rounded-2xl border bg-white px-5 py-4 text-left shadow-sm transition hover:border-slate-300 hover:shadow-md ${
+        active ? "border-blue-500 ring-2 ring-blue-500/20" : "border-slate-200/80"
+      }`}
+    >
       {showAccent ? (
         <span className={`absolute bottom-3 left-0 top-3 w-1 rounded-r-full ${style.accent}`} />
       ) : null}
@@ -81,11 +93,16 @@ function StatCard({
       >
         {icon}
       </span>
-    </article>
+    </button>
   );
 }
 
-export default function StatCards() {
+type StatCardsProps = {
+  activeFilter?: StatusFilter;
+  onSelectFilter?: (filter: StatusFilter) => void;
+};
+
+export default function StatCards({ activeFilter = "Semua", onSelectFilter }: StatCardsProps) {
   const [summary, setSummary] = useState<ReportSummary | null>(null);
   const [error, setError] = useState("");
 
@@ -108,6 +125,15 @@ export default function StatCards() {
     summary && total > 0 ? `${((summary.verifiedAndHandled / total) * 100).toFixed(1)}% ratio` : "—";
   const valueOf = (value: number | undefined) => (summary ? formatCount(value ?? 0) : "—");
 
+  const pick = (target: StatusFilter) => {
+    if (!onSelectFilter) return;
+    if (target === "Semua") {
+      onSelectFilter("Semua");
+      return;
+    }
+    onSelectFilter(activeFilter === target ? "Semua" : target);
+  };
+
   return (
     <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
       {error ? (
@@ -118,6 +144,8 @@ export default function StatCards() {
       <StatCard
         tone="slate"
         showAccent={false}
+        active={activeFilter === "Semua"}
+        onClick={() => pick("Semua")}
         label="Total Laporan Terdata"
         value={valueOf(summary?.totalReports)}
         caption="Titik terpetakan dalam sistem"
@@ -125,6 +153,8 @@ export default function StatCards() {
       />
       <StatCard
         tone="orange"
+        active={activeFilter === "Pending"}
+        onClick={() => pick("Pending")}
         label="Menunggu Verifikasi"
         value={valueOf(summary?.pendingVerification)}
         caption="Perlu aksi verifikator dinas"
@@ -137,6 +167,8 @@ export default function StatCards() {
       />
       <StatCard
         tone="blue"
+        active={activeFilter === "Terverifikasi & Ditangani"}
+        onClick={() => pick("Terverifikasi & Ditangani")}
         label="Terverifikasi & Ditangani"
         value={valueOf(summary?.verifiedAndHandled)}
         caption="Diteruskan ke tim lapangan PUPR"
@@ -149,6 +181,8 @@ export default function StatCards() {
       />
       <StatCard
         tone="green"
+        active={activeFilter === "Selesai"}
+        onClick={() => pick("Selesai")}
         label="Selesai Ditambal"
         value={valueOf(summary?.completed)}
         caption="Perbaikan selesai & tertutup"

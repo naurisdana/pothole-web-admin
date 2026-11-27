@@ -8,31 +8,34 @@ type QueueChartsProps = {
 function Donut({ slices, total }: { slices: InsightSlice[]; total: number }) {
   const radius = 42;
   const circumference = 2 * Math.PI * radius;
-  let offset = 0;
   const safeTotal = total || 1;
+  const segments = slices.reduce<Array<InsightSlice & { length: number; offset: number }>>(
+    (acc, slice) => {
+      const prev = acc[acc.length - 1];
+      const offset = prev ? prev.offset + prev.length : 0;
+      const length = (slice.value / safeTotal) * circumference;
+      return [...acc, { ...slice, length, offset }];
+    },
+    [],
+  );
 
   return (
     <svg viewBox="0 0 120 120" className="h-40 w-40 shrink-0" role="img" aria-label="Donat kategori urgensi">
       <circle cx="60" cy="60" r={radius} fill="none" stroke="#e2e8f0" strokeWidth="14" />
-      {slices.map((slice) => {
-        const length = (slice.value / safeTotal) * circumference;
-        const circle = (
-          <circle
-            key={slice.key}
-            cx="60"
-            cy="60"
-            r={radius}
-            fill="none"
-            stroke={slice.color}
-            strokeWidth="14"
-            strokeDasharray={`${length} ${circumference - length}`}
-            strokeDashoffset={-offset}
-            transform="rotate(-90 60 60)"
-          />
-        );
-        offset += length;
-        return circle;
-      })}
+      {segments.map((seg) => (
+        <circle
+          key={seg.key}
+          cx="60"
+          cy="60"
+          r={radius}
+          fill="none"
+          stroke={seg.color}
+          strokeWidth="14"
+          strokeDasharray={`${seg.length} ${circumference - seg.length}`}
+          strokeDashoffset={-seg.offset}
+          transform="rotate(-90 60 60)"
+        />
+      ))}
       <text x="60" y="57" textAnchor="middle" fill="#0f172a" fontSize="20" fontWeight="700">
         {total}
       </text>

@@ -4,7 +4,6 @@ import {
   Compass,
   Cpu,
   Gauge,
-  Images,
   MapPin,
   ScanLine,
   ShieldCheck,
@@ -116,20 +115,6 @@ function telemetryFor(report: PotholeReport): InspectionTelemetry {
     };
   }
 
-  if (report.id === "RS-20241024-001") {
-    return {
-      accuracyM: 3.8,
-      speedKmh: 34.5,
-      headingDeg: 182,
-      deviceUuid: "9b1deb4d-4b16-4f2a-9c1e-0a6f2e8b7c31",
-      deviceName: "Snapdragon 720G",
-      model: "YOLOv8n-INT8-v1.2",
-      fileKb: 248,
-      sha: "4f8b7c21a09e44d199a1",
-      district: "Bogor Tengah",
-    };
-  }
-
   const seed = [...report.id].reduce((sum, char) => sum + char.charCodeAt(0), 0);
   const uuidHead = (seed * 17).toString(16).padStart(8, "0").slice(0, 8);
   return {
@@ -149,7 +134,6 @@ function detectionConfidence(report: PotholeReport): number {
   if (report.confidence != null) {
     return report.confidence <= 1 ? Math.round(report.confidence * 100) : Math.round(report.confidence);
   }
-  if (report.id === "RS-20241024-001") return 84;
   return Math.min(97, Math.max(62, Math.round(62 + report.score * 0.28)));
 }
 
@@ -157,8 +141,8 @@ function shortHash(sha: string): string {
   return `${sha.slice(0, 4)}…${sha.slice(-4)}`;
 }
 
-function EvidenceScene({ frame, zoomed }: { frame: number; zoomed: boolean }) {
-  const shift = frame === 0 ? -24 : frame === 2 ? 24 : 0;
+function EvidenceScene({ zoomed }: { zoomed: boolean }) {
+  const shift = 0;
 
   return (
     <svg
@@ -196,8 +180,6 @@ export default function ReportDetailModal({
   onStatusChange,
 }: ReportDetailModalProps) {
   const [zoomed, setZoomed] = useState(false);
-  const [showFrames, setShowFrames] = useState(false);
-  const [frame, setFrame] = useState(1);
   const [notice, setNotice] = useState("");
   const [photoFailed, setPhotoFailed] = useState(false);
 
@@ -218,13 +200,13 @@ export default function ReportDetailModal({
     };
   }, [report, onClose]);
 
-  useEffect(() => {
+  const [prevReportId, setPrevReportId] = useState<string | undefined>(report?.id);
+  if (report?.id !== prevReportId) {
+    setPrevReportId(report?.id);
     setZoomed(false);
-    setShowFrames(false);
-    setFrame(1);
     setNotice("");
     setPhotoFailed(false);
-  }, [report?.id]);
+  }
 
   if (!report) return null;
 
@@ -233,7 +215,6 @@ export default function ReportDetailModal({
   const telemetry = telemetryFor(current);
   const confidence = detectionConfidence(current);
   const agency = `PUPR KOTA ${(current.city ?? "Bogor").toUpperCase()}`;
-  const frameShift = ["object-left", "object-center", "object-right"][frame] ?? "object-center";
 
   const parameters = [
     {
@@ -344,12 +325,12 @@ export default function ReportDetailModal({
             </div>
 
             <div className={`relative mt-3 overflow-hidden rounded-xl bg-slate-700 ${zoomed ? "h-80" : "h-52"}`}>
-              <EvidenceScene frame={frame} zoomed={zoomed} />
+              <EvidenceScene zoomed={zoomed} />
               {photoFailed ? null : (
                 <img
                   src={report.image_url}
                   alt=""
-                  className={`absolute inset-0 h-full w-full ${frameShift} ${zoomed ? "scale-125 object-cover" : "object-cover"}`}
+                  className={`absolute inset-0 h-full w-full object-center ${zoomed ? "scale-125 object-cover" : "object-cover"}`}
                   onError={() => setPhotoFailed(true)}
                 />
               )}
@@ -375,37 +356,7 @@ export default function ReportDetailModal({
                 <ZoomIn className="h-3.5 w-3.5" aria-hidden="true" />
                 {zoomed ? "Ukuran Normal" : "Zoom Resolusi Penuh"}
               </button>
-              <button
-                type="button"
-                onClick={() => setShowFrames((open) => !open)}
-                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-              >
-                <Images className="h-3.5 w-3.5" aria-hidden="true" />
-                Lihat 3 Frame Pendukung
-              </button>
             </div>
-
-            {showFrames ? (
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                {["-2 dtk", "Terbaik", "+2 dtk"].map((label, index) => (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() => setFrame(index)}
-                    className={`cursor-pointer overflow-hidden rounded-lg border text-left ${
-                      frame === index ? "border-blue-500" : "border-slate-200"
-                    }`}
-                  >
-                    <span className="block h-16 overflow-hidden bg-slate-600">
-                      <EvidenceScene frame={index} zoomed={false} />
-                    </span>
-                    <span className="block px-2 py-1 text-[10px] font-semibold text-slate-500">
-                      Frame {label}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            ) : null}
 
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
               <p>

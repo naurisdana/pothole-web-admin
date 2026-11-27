@@ -33,6 +33,7 @@ type ReportQueueProps = {
 const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "Semua", label: "Semua" },
   { value: "Pending", label: "Pending" },
+  { value: "Terverifikasi & Ditangani", label: "Terverifikasi & Ditangani" },
   { value: "Terverifikasi", label: "Terverifikasi" },
   { value: "Dalam Penanganan", label: "Dalam Penanganan" },
   { value: "Selesai", label: "Selesai" },
